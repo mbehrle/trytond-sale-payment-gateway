@@ -5,7 +5,7 @@
     <field name="gateway" widget="selection" colspan="3"/>
     <newline />
     <label name="credit_account"/>
-    <field name="credit_account" colspan="3"/>
+    <field name="credit_account" widget="selection" colspan="3"/>
     <newline />
     <label name="amount"/>
     <field name="amount"/>
