@@ -22,7 +22,7 @@ msgid ""
 "Payments: %s"
 msgstr ""
 "Fehlbetrag in Zahlung:\n"
-"Zu autorisierterender Betrag: %\n"
+"Zu autorisierender Betrag: %s\n"
 "Verbleibender Betrag: %s\n"
 "Zahlungen: %s"
 
@@ -34,7 +34,7 @@ msgid ""
 "Payments: %s"
 msgstr ""
 "Fehlbetrag in Zahlung:\n"
-"Einzuziehender Betrag: %\n"
+"Einzuziehender Betrag: %s\n"
 "Verbleibender Betrag: %s\n"
 "Zahlungen: %s"
 
@@ -52,11 +52,11 @@ msgstr "Zahlung"
 
 msgctxt "field:sale.configuration,payment_authorize_on:"
 msgid "Payment Authorize On"
-msgstr "Zahlungsautorisierung bei"
+msgstr "Zahlungsautorisierung"
 
 msgctxt "field:sale.configuration,payment_capture_on:"
 msgid "Payment Capture On"
-msgstr "Zahlungseinzug bei"
+msgstr "Zahlungseinzug"
 
 msgctxt "field:sale.payment,amount:"
 msgid "Amount"
@@ -111,7 +111,7 @@ msgid "ID"
 msgstr "ID"
 
 msgctxt "field:sale.payment,method:"
-msgid "Payment Method"
+msgid "Method"
 msgstr "Zahlungsmethode"
 
 msgctxt "field:sale.payment,party:"
@@ -127,7 +127,7 @@ msgid "Payment Transactions"
 msgstr "Zahlungstransaktionen"
 
 msgctxt "field:sale.payment,provider:"
-msgid "Payment Provider"
+msgid "Provider"
 msgstr "Zahlungsprovider"
 
 msgctxt "field:sale.payment,rec_name:"
@@ -240,7 +240,7 @@ msgstr "Gateway Transaktionen"
 
 msgctxt "field:sale.sale,payment_authorize_on:"
 msgid "Payment Authorize On"
-msgstr "Zahlungsautorisierung bei"
+msgstr "Zahlungsautorisierung"
 
 msgctxt "field:sale.sale,payment_authorized:"
 msgid "Payment Authorized"
@@ -252,7 +252,7 @@ msgstr "Zahlung verbleibend"
 
 msgctxt "field:sale.sale,payment_capture_on:"
 msgid "Payment Captured On"
-msgstr "Zahlungseinzug bei"
+msgstr "Zahlungseinzug"
 
 msgctxt "field:sale.sale,payment_captured:"
 msgid "Payment Captured"
@@ -334,6 +334,30 @@ msgstr "Zahlung"
 msgctxt "model:sale.payment.add_view,name:"
 msgid "View for adding Sale Payments"
 msgstr "Verkauf Zahlung Eingeben"
+
+msgctxt "selection:sale.configuration,payment_authorize_on:"
+msgid "Manual"
+msgstr "Manuell"
+
+msgctxt "selection:sale.configuration,payment_authorize_on:"
+msgid "Sale Confirm"
+msgstr "Bei Auftragsbestätigung"
+
+msgctxt "selection:sale.configuration,payment_authorize_on:"
+msgid "Sale Process"
+msgstr "Bei Auftragsausführung"
+
+msgctxt "selection:sale.configuration,payment_capture_on:"
+msgid "Manual"
+msgstr "Manuell"
+
+msgctxt "selection:sale.configuration,payment_capture_on:"
+msgid "Sale Confirm"
+msgstr "Bei Auftragsbestätigung"
+
+msgctxt "selection:sale.configuration,payment_capture_on:"
+msgid "Sale Process"
+msgstr "Bei Auftragsausführung"
 
 msgctxt "selection:sale.payment.add_view,expiry_month:"
 msgid "01-January"
