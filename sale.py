@@ -135,7 +135,7 @@ class Sale:
         """
         SaleConfiguration = Pool().get('sale.configuration')
 
-        return SaleConfiguration.get_authorize_options()
+        return SaleConfiguration.payment_authorize_on.selection
 
     @classmethod
     def get_capture_options(cls):
@@ -143,7 +143,7 @@ class Sale:
         """
         SaleConfiguration = Pool().get('sale.configuration')
 
-        return SaleConfiguration.get_capture_options()
+        return SaleConfiguration.payment_capture_on.selection
 
     @staticmethod
     def default_payment_authorize_on():
