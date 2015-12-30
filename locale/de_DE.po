@@ -96,7 +96,7 @@ msgstr "Habenkonto"
 
 msgctxt "field:sale.payment,currency_digits:"
 msgid "Currency Digits"
-msgstr "Währung (signifikante Stellen)"
+msgstr "Nachkommastellen Währung"
 
 msgctxt "field:sale.payment,description:"
 msgid "Description"
@@ -176,7 +176,7 @@ msgstr "Karte Sicherheitscode (CVV/CVD)"
 
 msgctxt "field:sale.payment.add_view,currency_digits:"
 msgid "Currency Digits"
-msgstr "Währung (signifikante Stellen)"
+msgstr "Nachkommastellen Währung"
 
 msgctxt "field:sale.payment.add_view,expiry_month:"
 msgid "Expiry Month"
