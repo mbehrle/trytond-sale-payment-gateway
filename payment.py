@@ -10,6 +10,10 @@ from trytond import backend
 from sql.functions import Trim, Substring
 from sql.operators import Concat
 
+from nereid.contrib.locale import make_lazy_gettext
+
+_ = make_lazy_gettext('sale_payment_gateway')
+
 __all__ = ['Payment']
 __metaclass__ = PoolMeta
 
@@ -337,10 +341,10 @@ class Payment(ModelSQL, ModelView):
         This can be used in documents to show payment details
         """
         if self.method == 'manual':
-            return "Paid by Cash"
+            return _('Paid by Cash')
         elif self.method == 'credit_card':
             return (
-                "Paid by Card " + "(" + ("xxxx " * 3) +
+                _('Paid by Card') + " (" + ("xxxx " * 3) +
                 self.payment_profile.last_4_digits + ")"
             )
 
