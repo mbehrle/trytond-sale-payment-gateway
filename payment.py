@@ -341,11 +341,11 @@ class Payment(ModelSQL, ModelView):
         This can be used in documents to show payment details
         """
         if self.method == 'manual':
-            return _('Paid by Cash')
+            return unicode(_('Paid by Cash'))
         elif self.method == 'credit_card':
             return (
-                _('Paid by Card') + " (" + ("xxxx " * 3) +
-                self.payment_profile.last_4_digits + ")"
+                unicode(_('Paid by Card')) + ' (' + ('xxxx ' * 3) +
+                self.payment_profile.last_4_digits + ')'
             )
 
     @classmethod
