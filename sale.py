@@ -8,6 +8,9 @@ from trytond.pyson import Eval, Bool, And, Not, Or, If
 from trytond.wizard import Wizard, StateView, StateTransition, Button
 
 from trytond.modules.payment_gateway.transaction import BaseCreditCardViewMixin
+from nereid.contrib.locale import make_lazy_gettext
+
+_ = make_lazy_gettext('sale_payment_gateway')
 
 __all__ = ['Sale', 'PaymentTransaction', 'AddSalePaymentView', 'AddSalePayment']
 __metaclass__ = PoolMeta
@@ -114,7 +117,12 @@ class Sale:
                 "Payments: %s",
             "auth_before_capture":
                 "Payment authorization must happen before capture",
-            "sale_payments_waiting": "Sale Payments are %s",
+            'payments_waiting_authorization': 'Sale Payments are '
+                'waiting for authorization',
+            'payments_waiting_capture': 'Sale Payments are '
+                'waiting for capture',
+            'different_profile_owner': 'Payment profile owner is %s, '
+                ' but the current customer is %s.',
         })
 
     @classmethod
@@ -217,22 +225,19 @@ class Sale:
         ))
 
     def _raise_sale_payments_waiting(self):
-        Sale = Pool().get('sale.sale')
+        if self.payment_processing_state == 'waiting_for_auth':
+            self.raise_user_error('payments_waiting_authorization')
+        elif self.payment_processing_state == 'waiting_for_capture':
+            self.raise_user_error('payments_waiting_capture')
 
-        self.raise_user_error(
-            "sale_payments_waiting", (
-                dict(Sale.payment_processing_state.selection).get(
-                    self.payment_processing_state
-                ),
-            )
-        )
-
-    def authorize_payments(self, amount, description="Payment from sale"):
+    def authorize_payments(self, amount, description=''):
         """
         Authorize sale payments. It actually creates payment transactions
         corresponding to sale payments and set the payment processing state to
         `waiting to auth`.
         """
+        if not description:
+            description = unicode(_('Payment from sale'))
         if self.payment_processing_state:
             self._raise_sale_payments_waiting()
 
@@ -273,12 +278,14 @@ class Sale:
 
         return transactions
 
-    def capture_payments(self, amount, description="Payment from sale"):
+    def capture_payments(self, amount, description=''):
         """Capture sale payments.
 
         * If existing authorizations exist, capture them
         * If not, capture available payments directly
         """
+        if not description:
+            description = unicode(_('Payment from sale'))
         if self.payment_processing_state:
             self._raise_sale_payments_waiting()
 
@@ -361,7 +368,7 @@ class Sale:
                     not payment.payment_transactions:
                 payment_transaction = payment._create_payment_transaction(
                     payment.amount_available,
-                    'Post manual payments on Processing Order',
+                    unicode(_('Post manual payments on Processing Order')),
                 )
                 payment_transaction.save()
                 payment.capture()
@@ -438,7 +445,7 @@ class Sale:
 
         if payment_profile.party != self.party:
             self.raise_user_error(
-                "Payment profile'd owner is %s, but the customer is %s" % (
+                'different_profile_owner', error_args=(
                     payment_profile.party.name,
                     self.party.name,
                 )
