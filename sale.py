@@ -379,7 +379,7 @@ class Sale:
     def confirm(cls, sales):
         super(Sale, cls).confirm(sales)
 
-        for sale in sales:
+        for sale in [s for s in sales if s.invoice_state != 'paid']:
             sale.handle_payment_on_confirm()
 
     @classmethod
@@ -387,7 +387,7 @@ class Sale:
     def proceed(cls, sales):
         super(Sale, cls).proceed(sales)
 
-        for sale in sales:
+        for sale in [s for s in sales if s.invoice_state != 'paid']:
             sale.handle_payment_on_process()
             sale.settle_manual_payments()
 
