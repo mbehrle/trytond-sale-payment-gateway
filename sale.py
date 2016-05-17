@@ -289,7 +289,8 @@ class Sale:
         if self.payment_processing_state:
             self._raise_sale_payments_waiting()
 
-        if amount > (self.payment_available + self.payment_authorized):
+        if ((amount > (self.payment_available + self.payment_authorized))
+                and not amount <= self.payment_collected):
             self.raise_user_error(
                 "insufficient_amount_to_capture", error_args=(
                     amount,
@@ -372,6 +373,7 @@ class Sale:
                 )
                 payment_transaction.save()
                 payment.capture()
+                self.payment_processing_state = None
 
     @classmethod
     @ModelView.button
@@ -388,8 +390,8 @@ class Sale:
         super(Sale, cls).proceed(sales)
 
         for sale in [s for s in sales if s.invoice_state != 'paid']:
-            sale.handle_payment_on_process()
             sale.settle_manual_payments()
+            sale.handle_payment_on_process()
 
     def _pay_using_credit_card(self, gateway, credit_card, amount):
         '''
