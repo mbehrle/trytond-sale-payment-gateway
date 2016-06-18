@@ -1,4 +1,5 @@
 <form string="Add Payment" col="4">
+    <field name="sale" colspan="4" invisible="1"/>
     <field name="company" colspan="4" invisible="1"/>
     <newline />
     <label name="gateway"/>
