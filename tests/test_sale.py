@@ -8,7 +8,10 @@ from dateutil.relativedelta import relativedelta
 import pycountry
 
 import trytond.tests.test_tryton
-from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
+from trytond.tests.test_tryton import (
+    POOL, USER, CONTEXT,
+    ModuleTestCase, with_transaction
+)
 from trytond.transaction import Transaction
 from trytond.exceptions import UserError
 
@@ -17,17 +20,18 @@ if 'DB_NAME' not in os.environ:
     os.environ['DB_NAME'] = ':memory:'
 
 
-class BaseTestCase(unittest.TestCase):
+class BaseTestCase(ModuleTestCase):
     '''
     Base Test Case sale payment module.
     '''
+
+    module = 'sale_payment_gateway'
 
     def setUp(self):
         """
         Set up data used in the tests.
         this method is called before each test function execution.
         """
-        trytond.tests.test_tryton.install_module('sale_payment_gateway')
 
         self.Currency = POOL.get('currency.currency')
         self.Company = POOL.get('company.company')
@@ -95,7 +99,8 @@ class BaseTestCase(unittest.TestCase):
             'account.create_chart', type="wizard")
 
         account_template, = AccountTemplate.search(
-            [('parent', '=', None)]
+            [('parent', '=', None),
+             ('name', '=', 'Minimal Account Chart')]
         )
 
         session_id, _, _ = account_create_chart.create()
@@ -339,6 +344,7 @@ class TestSale(BaseTestCase):
         self.Sale.proceed(sales)
         self.Sale.process_all_pending_payments()
 
+    @with_transaction()
     def test_0005_single_payment_CASE1(self):
         """
         ===================================
@@ -350,61 +356,61 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            # Create a payment
-            payment_details = {
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-            }
-            payment_details.update({
-                'credit_account':
-                    self.SalePayment(
-                        **payment_details).on_change_with_credit_account()
-            })
-            payment = self.SalePayment(**payment_details)
-            payment.save()
+        # Create a payment
+        payment_details = {
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+        }
+        payment_details.update({
+            'credit_account':
+                self.SalePayment(
+                    **payment_details).on_change_with_credit_account()
+        })
+        payment = self.SalePayment(**payment_details)
+        payment.save()
 
-            self.assertTrue(payment.description.startswith("Paid by Card"))
-            self.assertTrue(payment.credit_account)
-            self.assertEqual(
-                payment.credit_account, self.party.account_receivable)
-            self.assertEqual(payment.company.id, sale.company.id)
+        self.assertTrue(payment.description.startswith("Paid by Card"))
+        self.assertTrue(payment.credit_account)
+        self.assertEqual(
+            payment.credit_account, self.party.account_receivable)
+        self.assertEqual(payment.company.id, sale.company.id)
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                # confirm and process the sale, payment will not go
-                # through because capture and auth is manual.
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            # confirm and process the sale, payment will not go
+            # through because capture and auth is manual.
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0010_single_payment_CASE2(self):
         """
         ===================================
@@ -416,55 +422,55 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='sale_confirm',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_confirm',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            # Create a payment
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0015_single_payment_CASE3(self):
         """
         ===================================
@@ -476,54 +482,54 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0020_single_payment_CASE4(self):
         """
         ===================================
@@ -535,55 +541,55 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            # Create a payment
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
 
+    @with_transaction()
     def test_0025_single_payment_CASE5(self):
         """
         ===================================
@@ -595,57 +601,57 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='sale_confirm',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='sale_confirm',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            # Create a payment
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
 
-            # No authorized amount becasue it was captured after that.
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        # No authorized amount becasue it was captured after that.
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0030_single_payment_CASE6(self):
         """
         ===================================
@@ -657,54 +663,54 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0035_single_payment_CASE7(self):
         """
         ===================================
@@ -716,54 +722,54 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_process',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_process',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
 
+    @with_transaction()
     def test_0040_single_payment_CASE8(self):
         """
         ===================================
@@ -775,17 +781,17 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale_config = self.SaleConfiguration(1)
-            sale_config.payment_authorize_on = 'sale_process'
-            sale_config.payment_capture_on = 'sale_confirm'
+        sale_config = self.SaleConfiguration(1)
+        sale_config.payment_authorize_on = 'sale_process'
+        sale_config.payment_capture_on = 'sale_confirm'
 
-            # This is invalid case so it should raise user error.
-            with self.assertRaises(UserError):
-                sale_config.save()
+        # This is invalid case so it should raise user error.
+        with self.assertRaises(UserError):
+            sale_config.save()
 
+    @with_transaction()
     def test_0045_single_payment_CASE9(self):
         """
         ===================================
@@ -797,57 +803,57 @@ class TestSale(BaseTestCase):
         Payment 1               |   $200
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_process',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_process',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            payment, = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('200'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
 
-            # Authorize amount is zero because payment captured after
-            # that.
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        # Authorize amount is zero because payment captured after
+        # that.
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0050_multi_payment_CASE1(self):
         """
         ===================================
@@ -860,54 +866,54 @@ class TestSale(BaseTestCase):
         Payment 2   (cc)        |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            payment_1, payment_2 = self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
-            self.assertTrue(payment_1.description.startswith("Paid by Cash"))
+        payment_1, payment_2 = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+        self.assertTrue(payment_1.description.startswith("Paid by Cash"))
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                # confirm and process the sale, payment will not go
-                # through because capture and auth is manual.
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            # confirm and process the sale, payment will not go
+            # through because capture and auth is manual.
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('100'))
-            self.assertEqual(sale.payment_collected, Decimal('100'))
-            self.assertEqual(sale.payment_captured, Decimal('100'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('100'))
+        self.assertEqual(sale.payment_collected, Decimal('100'))
+        self.assertEqual(sale.payment_captured, Decimal('100'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0055_multi_payment_CASE2(self):
         """
         ===================================
@@ -920,59 +926,59 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='sale_confirm',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_confirm',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0060_multi_payment_CASE3(self):
         """
         ===================================
@@ -985,59 +991,59 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='manual',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0065_multi_payment_CASE4(self):
         """
         ===================================
@@ -1050,59 +1056,59 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('100'))
-            self.assertEqual(sale.payment_collected, Decimal('100'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('100'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('100'))
+        self.assertEqual(sale.payment_collected, Decimal('100'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('100'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('100'))
-            self.assertEqual(sale.payment_authorized, Decimal('100'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('100'))
+        self.assertEqual(sale.payment_authorized, Decimal('100'))
 
+    @with_transaction()
     def test_0070_multi_payment_CASE5(self):
         """
         ===================================
@@ -1115,61 +1121,61 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='sale_confirm',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='sale_confirm',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
 
-            # No authorized amount becasue it was captured after that.
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        # No authorized amount becasue it was captured after that.
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0075_multi_payment_CASE6(self):
         """
         ===================================
@@ -1182,59 +1188,59 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('100'))
-            self.assertEqual(sale.payment_collected, Decimal('100'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('100'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('100'))
+        self.assertEqual(sale.payment_collected, Decimal('100'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('100'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0080_multi_payment_CASE7(self):
         """
         ===================================
@@ -1247,59 +1253,59 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_process',
-                payment_capture_on='manual',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_process',
+            payment_capture_on='manual',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('100'))
-            self.assertEqual(sale.payment_authorized, Decimal('100'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('100'))
+        self.assertEqual(sale.payment_authorized, Decimal('100'))
 
+    @with_transaction()
     def test_0085_multi_payment_CASE8(self):
         """
         ===================================
@@ -1312,85 +1318,85 @@ class TestSale(BaseTestCase):
         Payment 2 (cc)          |   $100
         ===================================
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_process',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_process',
+            payment_capture_on='sale_process',
+        )
 
-            self.assertEqual(sale.total_amount, Decimal('200'))
-            self.assertEqual(sale.payment_total, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            self.SalePayment.create([{
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.cash_gateway,
-                'credit_account': self.party.account_receivable.id,
-            }, {
-                'sale': sale.id,
-                'amount': Decimal('100'),
-                'gateway': self.dummy_gateway,
-                'payment_profile': self.dummy_cc_payment_profile.id,
-                'credit_account': self.party.account_receivable.id,
-            }])
+        self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.cash_gateway,
+            'credit_account': self.party.account_receivable.id,
+        }, {
+            'sale': sale.id,
+            'amount': Decimal('100'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self.Sale.quote([sale])
-                self._confirm_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('200'))
-            self.assertEqual(sale.payment_collected, Decimal('0'))
-            self.assertEqual(sale.payment_captured, Decimal('0'))
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
-            with Transaction().set_context(company=self.company.id):
-                self._process_sale_by_completing_payments([sale])
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
 
-            self.assertEqual(sale.payment_total, Decimal('200'))
-            self.assertEqual(sale.payment_available, Decimal('0'))
-            self.assertEqual(sale.payment_collected, Decimal('200'))
-            self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
 
-            # Authorize amount is zero because payment captured after
-            # that.
-            self.assertEqual(sale.payment_authorized, Decimal('0'))
+        # Authorize amount is zero because payment captured after
+        # that.
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
 
+    @with_transaction()
     def test_0090_test_duplicate_sale(self):
         """
         Test if payment_processing_state is not copied in duplicate sales
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_confirm',
-                payment_capture_on='sale_process',
-            )
-            sale.payment_processing_state = 'waiting_for_capture'
-            sale.save()
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='sale_process',
+        )
+        sale.payment_processing_state = 'waiting_for_capture'
+        sale.save()
 
-            self.assertEqual(
-                sale.payment_processing_state, 'waiting_for_capture')
+        self.assertEqual(
+            sale.payment_processing_state, 'waiting_for_capture')
 
-            new_sales = self.Sale.copy([sale])
-            self.assertTrue(new_sales)
-            self.assertEqual(len(new_sales), 1)
-            self.assertIsNone(new_sales[0].payment_processing_state)
-            self.assertFalse(new_sales[0].payments)
+        new_sales = self.Sale.copy([sale])
+        self.assertTrue(new_sales)
+        self.assertEqual(len(new_sales), 1)
+        self.assertIsNone(new_sales[0].payment_processing_state)
+        self.assertFalse(new_sales[0].payments)
 
+    @with_transaction()
     def test_0100_test_sale_payment_wizard(self):
         """
         Test the wizard used to create sale payments
@@ -1399,141 +1405,140 @@ class TestSale(BaseTestCase):
         SalePaymentWizard = POOL.get('sale.payment.add', type="wizard")
         PaymentProfile = POOL.get('party.payment_profile')
 
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.setup_defaults()
+        self.setup_defaults()
 
-            sale = self._create_sale(
-                payment_authorize_on='sale_process',
-                payment_capture_on='sale_process',
-            )
+        sale = self._create_sale(
+            payment_authorize_on='sale_process',
+            payment_capture_on='sale_process',
+        )
 
-            # Case I: Manual Payment
-            sale_payment_wizard1 = SalePaymentWizard(
-                SalePaymentWizard.create()[0]
-            )
+        # Case I: Manual Payment
+        sale_payment_wizard1 = SalePaymentWizard(
+            SalePaymentWizard.create()[0]
+        )
 
-            # Test default_payment_info
-            with Transaction().set_context(active_id=sale.id):
-                defaults = sale_payment_wizard1.default_payment_info()
-                self.assertEqual(defaults['sale'], sale.id)
-                self.assertEqual(defaults['party'], sale.party.id)
-                self.assertEqual(
-                    defaults['currency_digits'], sale.currency_digits
-                )
-
-            sale_payment_wizard1.payment_info.sale = sale.id
-            sale_payment_wizard1.payment_info.credit_account = \
-                sale.party.account_receivable.id
-            sale_payment_wizard1.payment_info.party = sale.party.id
-            sale_payment_wizard1.payment_info.gateway = self.cash_gateway.id
-            sale_payment_wizard1.payment_info.method = self.cash_gateway.method
-            sale_payment_wizard1.payment_info.amount = 100
-            sale_payment_wizard1.payment_info.payment_profile = None
-            sale_payment_wizard1.payment_info.currency_digits = \
-                sale_payment_wizard1.payment_info.get_currency_digits(
-                    name='currency_digits'
-                )
-            sale_payment_wizard1.payment_info.reference = 'Reference-1'
-            sale_payment_wizard1.payment_info.gift_card = None
-
-            with Transaction().set_context(active_id=sale.id):
-                sale_payment_wizard1.transition_add()
-
-            payment1, = SalePayment.search([
-                ('sale', '=', sale.id),
-                ('company', '=', self.company.id),
-            ], limit=1)
-            self.assertEqual(payment1.amount, 100)
-            self.assertEqual(payment1.party, sale.party)
-            self.assertEqual(payment1.method, self.cash_gateway.method)
-            self.assertEqual(payment1.provider, self.cash_gateway.provider)
-            self.assertEqual(payment1.reference, 'Reference-1')
-
-            # Case II: Credit Card Payment with new payment profile
-            sale_payment_wizard2 = SalePaymentWizard(
-                SalePaymentWizard.create()[0]
-            )
-
-            # Test if party has 1 payment profile already created
-            payment_profiles = PaymentProfile.search([
-                ('party', '=', sale.party.id)
-            ])
-            self.assertEqual(len(payment_profiles), 1)
-
-            sale_payment_wizard2.payment_info.sale = sale.id
-            sale_payment_wizard2.payment_info.credit_account = \
-                sale.party.account_receivable.id
-            sale_payment_wizard2.payment_info.party = sale.party.id
-            sale_payment_wizard2.payment_info.gateway = self.dummy_gateway.id
-            sale_payment_wizard2.payment_info.method = \
-                sale_payment_wizard2.payment_info.get_method()
-            sale_payment_wizard2.payment_info.use_existing_card = False
-            sale_payment_wizard2.payment_info.amount = 55
-            sale_payment_wizard2.payment_info.owner = sale.party.name
-            sale_payment_wizard2.payment_info.number = '4111111111111111'
-            sale_payment_wizard2.payment_info.expiry_month = '01'
-            sale_payment_wizard2.payment_info.expiry_year = '2018'
-            sale_payment_wizard2.payment_info.csc = '911'
-            sale_payment_wizard2.payment_info.payment_profile = None
-            sale_payment_wizard2.payment_info.reference = 'Reference-2'
-            sale_payment_wizard2.payment_info.gift_card = None
-
-            with Transaction().set_context(active_id=sale.id):
-                sale_payment_wizard2.transition_add()
-
-            payment2, = SalePayment.search([
-                ('sale', '=', sale.id),
-                ('amount', '=', 55),
-                ('company', '=', self.company.id),
-            ], limit=1)
-            self.assertEqual(payment2.method, self.dummy_gateway.method)
-            self.assertEqual(payment2.provider, self.dummy_gateway.provider)
-
-            # Test if new payment profile was created for party
-            new_payment_profile = PaymentProfile.search([
-                ('party', '=', sale.party.id)
-            ], order=[('id', 'DESC')])
-            self.assertEqual(len(new_payment_profile), 2)
+        # Test default_payment_info
+        with Transaction().set_context(active_id=sale.id):
+            defaults = sale_payment_wizard1.default_payment_info()
+            self.assertEqual(defaults['sale'], sale.id)
+            self.assertEqual(defaults['party'], sale.party.id)
             self.assertEqual(
-                new_payment_profile[0], payment2.payment_profile
+                defaults['currency_digits'], sale.currency_digits
             )
 
-            # Case III: Credit Card Payment with existing card
-            sale_payment_wizard3 = SalePaymentWizard(
-                SalePaymentWizard.create()[0]
+        sale_payment_wizard1.payment_info.sale = sale.id
+        sale_payment_wizard1.payment_info.credit_account = \
+            sale.party.account_receivable.id
+        sale_payment_wizard1.payment_info.party = sale.party.id
+        sale_payment_wizard1.payment_info.gateway = self.cash_gateway.id
+        sale_payment_wizard1.payment_info.method = self.cash_gateway.method
+        sale_payment_wizard1.payment_info.amount = 100
+        sale_payment_wizard1.payment_info.payment_profile = None
+        sale_payment_wizard1.payment_info.currency_digits = \
+            sale_payment_wizard1.payment_info.get_currency_digits(
+                name='currency_digits'
             )
+        sale_payment_wizard1.payment_info.reference = 'Reference-1'
+        sale_payment_wizard1.payment_info.gift_card = None
 
-            sale_payment_wizard3.payment_info.sale = sale.id
-            sale_payment_wizard3.payment_info.credit_account = \
-                sale.party.account_receivable.id
-            sale_payment_wizard3.payment_info.party = sale.party.id
-            sale_payment_wizard3.payment_info.gateway = self.dummy_gateway.id
-            sale_payment_wizard3.payment_info.method = self.dummy_gateway.method
-            sale_payment_wizard3.payment_info.use_existing_card = True
-            sale_payment_wizard3.payment_info.amount = 45
-            sale_payment_wizard3.payment_info.payment_profile = \
-                new_payment_profile[0]
-            sale_payment_wizard3.payment_info.reference = 'Reference-3'
-            sale_payment_wizard3.payment_info.gift_card = None
+        with Transaction().set_context(active_id=sale.id):
+            sale_payment_wizard1.transition_add()
 
-            with Transaction().set_context(active_id=sale.id):
-                sale_payment_wizard3.transition_add()
+        payment1, = SalePayment.search([
+            ('sale', '=', sale.id),
+            ('company', '=', self.company.id),
+        ], limit=1)
+        self.assertEqual(payment1.amount, 100)
+        self.assertEqual(payment1.party, sale.party)
+        self.assertEqual(payment1.method, self.cash_gateway.method)
+        self.assertEqual(payment1.provider, self.cash_gateway.provider)
+        self.assertEqual(payment1.reference, 'Reference-1')
 
-            payment3, = SalePayment.search([
-                ('sale', '=', sale.id),
-                ('amount', '=', 45),
-                ('company', '=', self.company.id),
-            ], limit=1)
-            self.assertEqual(payment3.method, self.dummy_gateway.method)
-            self.assertEqual(payment3.provider, self.dummy_gateway.provider)
-            self.assertEqual(
-                new_payment_profile[0], payment3.payment_profile
-            )
+        # Case II: Credit Card Payment with new payment profile
+        sale_payment_wizard2 = SalePaymentWizard(
+            SalePaymentWizard.create()[0]
+        )
 
-            self.assertEqual(SalePayment.search([], count=True), 3)
-            # Delete a payment
-            SalePayment.delete([payment3])
-            self.assertEqual(SalePayment.search([], count=True), 2)
+        # Test if party has 1 payment profile already created
+        payment_profiles = PaymentProfile.search([
+            ('party', '=', sale.party.id)
+        ])
+        self.assertEqual(len(payment_profiles), 1)
+
+        sale_payment_wizard2.payment_info.sale = sale.id
+        sale_payment_wizard2.payment_info.credit_account = \
+            sale.party.account_receivable.id
+        sale_payment_wizard2.payment_info.party = sale.party.id
+        sale_payment_wizard2.payment_info.gateway = self.dummy_gateway.id
+        sale_payment_wizard2.payment_info.method = \
+            sale_payment_wizard2.payment_info.get_method()
+        sale_payment_wizard2.payment_info.use_existing_card = False
+        sale_payment_wizard2.payment_info.amount = 55
+        sale_payment_wizard2.payment_info.owner = sale.party.name
+        sale_payment_wizard2.payment_info.number = '4111111111111111'
+        sale_payment_wizard2.payment_info.expiry_month = '01'
+        sale_payment_wizard2.payment_info.expiry_year = '2018'
+        sale_payment_wizard2.payment_info.csc = '911'
+        sale_payment_wizard2.payment_info.payment_profile = None
+        sale_payment_wizard2.payment_info.reference = 'Reference-2'
+        sale_payment_wizard2.payment_info.gift_card = None
+
+        with Transaction().set_context(active_id=sale.id):
+            sale_payment_wizard2.transition_add()
+
+        payment2, = SalePayment.search([
+            ('sale', '=', sale.id),
+            ('amount', '=', 55),
+            ('company', '=', self.company.id),
+        ], limit=1)
+        self.assertEqual(payment2.method, self.dummy_gateway.method)
+        self.assertEqual(payment2.provider, self.dummy_gateway.provider)
+
+        # Test if new payment profile was created for party
+        new_payment_profile = PaymentProfile.search([
+            ('party', '=', sale.party.id)
+        ], order=[('id', 'DESC')])
+        self.assertEqual(len(new_payment_profile), 2)
+        self.assertEqual(
+            new_payment_profile[0], payment2.payment_profile
+        )
+
+        # Case III: Credit Card Payment with existing card
+        sale_payment_wizard3 = SalePaymentWizard(
+            SalePaymentWizard.create()[0]
+        )
+
+        sale_payment_wizard3.payment_info.sale = sale.id
+        sale_payment_wizard3.payment_info.credit_account = \
+            sale.party.account_receivable.id
+        sale_payment_wizard3.payment_info.party = sale.party.id
+        sale_payment_wizard3.payment_info.gateway = self.dummy_gateway.id
+        sale_payment_wizard3.payment_info.method = self.dummy_gateway.method
+        sale_payment_wizard3.payment_info.use_existing_card = True
+        sale_payment_wizard3.payment_info.amount = 45
+        sale_payment_wizard3.payment_info.payment_profile = \
+            new_payment_profile[0]
+        sale_payment_wizard3.payment_info.reference = 'Reference-3'
+        sale_payment_wizard3.payment_info.gift_card = None
+
+        with Transaction().set_context(active_id=sale.id):
+            sale_payment_wizard3.transition_add()
+
+        payment3, = SalePayment.search([
+            ('sale', '=', sale.id),
+            ('amount', '=', 45),
+            ('company', '=', self.company.id),
+        ], limit=1)
+        self.assertEqual(payment3.method, self.dummy_gateway.method)
+        self.assertEqual(payment3.provider, self.dummy_gateway.provider)
+        self.assertEqual(
+            new_payment_profile[0], payment3.payment_profile
+        )
+
+        self.assertEqual(SalePayment.search([], count=True), 3)
+        # Delete a payment
+        SalePayment.delete([payment3])
+        self.assertEqual(SalePayment.search([], count=True), 2)
 
 
 def suite():
