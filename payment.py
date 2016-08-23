@@ -257,7 +257,10 @@ class Payment(ModelSQL, ModelView):
             ))
 
         elif name == "amount_available":
-            return max(self.amount - self.amount_consumed, Decimal('0'))
+            # XXX to check, if negative amounts always work
+            # originally was:
+            # return max(self.amount - self.amount_consumed, Decimal('0'))
+            return self.amount - self.amount_consumed
 
     @staticmethod
     def default_sequence():
