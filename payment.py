@@ -297,6 +297,7 @@ class Payment(ModelSQL, ModelView):
             gateway=self.gateway,
             sale_payment=self.id,
             provider_reference=self.reference,
+            origin='%s,%d' % (self.sale.__name__, self.sale.id),
         )
 
     def authorize(self):
