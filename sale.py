@@ -535,6 +535,13 @@ class PaymentTransaction:
         return self.sale_payment and self.sale_payment.sale and \
             self.sale_payment.sale.shipment_address.id
 
+    @classmethod
+    def _get_origin(cls):
+        'Add sale to the selections'
+        res = super(PaymentTransaction, cls)._get_origin()
+        res.append('sale.sale')
+        return res
+
 
 class AddSalePaymentView(BaseCreditCardViewMixin, ModelView):
     """
