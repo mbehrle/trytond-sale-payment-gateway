@@ -4,11 +4,6 @@ from decimal import Decimal
 from trytond.model import ModelSQL, ModelView, fields
 from trytond.pool import PoolMeta, Pool
 from trytond.pyson import Eval, Not, If
-from trytond.transaction import Transaction
-from trytond import backend
-
-from sql.functions import Trim, Substring
-from sql.operators import Concat
 
 from nereid.contrib.locale import make_lazy_gettext
 
@@ -126,64 +121,6 @@ class Payment(ModelSQL, ModelView):
         Return the method based on the gateway
         """
         return self.gateway and self.gateway.method or None
-
-    @classmethod
-    def __register__(cls, module_name):
-        Party = Pool().get('party.party')
-        Sale = Pool().get('sale.sale')
-        Model = Pool().get('ir.model')
-        ModelField = Pool().get('ir.model.field')
-        Property = Pool().get('ir.property')
-        TableHandler = backend.get('TableHandler')
-        cursor = Transaction().cursor
-        table = TableHandler(cursor, cls, module_name)
-
-        migration_needed = False
-        if not table.column_exist('credit_account'):
-            migration_needed = True
-
-        super(Payment, cls).__register__(module_name)
-
-        if migration_needed and not Pool.test:
-            # Migration
-            # Set party's receivable account as the credit_account on
-            # sale payments
-            payment = cls.__table__()
-            party = Party.__table__()
-            property = Property.__table__()
-            sale = Sale.__table__()
-
-            account_model, = Model.search([
-                ('model', '=', 'party.party'),
-            ])
-            account_receivable_field, = ModelField.search([
-                ('model', '=', account_model.id),
-                ('name', '=', 'account_receivable'),
-                ('ttype', '=', 'many2one'),
-            ])
-
-            update = payment.update(
-                columns=[payment.credit_account],
-                values=[
-                    Trim(
-                        Substring(property.value, ',.*'), 'LEADING', ','
-                    ).cast(cls.credit_account.sql_type().base)
-                ],
-                from_=[sale, party, property],
-                where=(
-                    payment.sale == sale.id
-                ) & (
-                    sale.party == party.id
-                ) & (
-                    property.res == Concat(Party.__name__ + ',', party.id)
-                ) & (
-                    property.field == account_receivable_field.id
-                ) & (
-                    property.company == sale.company
-                )
-
-            )
-            cursor.execute(*update)
 
     @classmethod
     def __setup__(cls):
