@@ -376,13 +376,13 @@ class Sale:
             sale.handle_payment_on_confirm()
 
     @classmethod
-    @Workflow.transition('processing')
-    def proceed(cls, sales):
-        super(Sale, cls).proceed(sales)
-
+    def process(cls, sales):
         for sale in sales:
+            if sale.state != 'confirmed':
+                continue
             sale.handle_payment_on_process()
             sale.settle_manual_payments()
+        super(Sale, cls).proceed(sales)
 
     def _pay_using_credit_card(self, gateway, credit_card, amount):
         '''
