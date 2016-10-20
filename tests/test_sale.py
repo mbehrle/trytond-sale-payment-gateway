@@ -341,7 +341,7 @@ class TestSale(BaseTestCase):
     def _process_sale_by_completing_payments(self, sales):
         """Process sale and complete payments.
         """
-        self.Sale.proceed(sales)
+        self.Sale.process(sales)
         self.Sale.process_all_pending_payments()
 
     @with_transaction()
