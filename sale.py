@@ -382,7 +382,7 @@ class Sale:
                 continue
             sale.handle_payment_on_process()
             sale.settle_manual_payments()
-        super(Sale, cls).proceed(sales)
+        super(Sale, cls).process(sales)
 
     def _pay_using_credit_card(self, gateway, credit_card, amount):
         '''
