@@ -338,17 +338,25 @@ class Sale:
 
     def handle_payment_on_confirm(self):
         if self.payment_capture_on == 'sale_confirm':
-            self.capture_payments(self.total_amount)
+            self.capture_payments(
+                self.total_amount - self.payment_captured
+            )
 
         elif self.payment_authorize_on == 'sale_confirm':
-            self.authorize_payments(self.total_amount)
+            self.authorize_payments(
+                self.total_amount - self.payment_authorized
+            )
 
     def handle_payment_on_process(self):
         if self.payment_capture_on == 'sale_process':
-            self.capture_payments(self.total_amount)
+            self.capture_payments(
+                self.total_amount - self.payment_captured
+            )
 
         elif self.payment_authorize_on == 'sale_process':
-            self.authorize_payments(self.total_amount)
+            self.authorize_payments(
+                self.total_amount - self.payment_authorized
+            )
 
     def settle_manual_payments(self):
         """
