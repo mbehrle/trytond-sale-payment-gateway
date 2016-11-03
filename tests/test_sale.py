@@ -47,6 +47,7 @@ class BaseTestCase(ModuleTestCase):
         self.Journal = POOL.get('account.journal')
         self.PaymentGateway = POOL.get('payment_gateway.gateway')
         self.Sale = POOL.get('sale.sale')
+        self.SaleLine = POOL.get('sale.line')
         self.SalePayment = POOL.get('sale.payment')
         self.SaleConfiguration = POOL.get('sale.configuration')
         self.Group = POOL.get('res.group')
@@ -471,6 +472,315 @@ class TestSale(BaseTestCase):
         self.assertEqual(sale.payment_authorized, Decimal('0'))
 
     @with_transaction()
+    def test_0013_single_payment_CASE2B(self):
+        """
+        ===================================
+        Total Sale Amount       |   $200
+        Payment Authorize On:   | 'manual'
+        Payment Capture On:     | 'sale_confirm'
+        ===================================
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft > Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $200
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft (line x 2 )> Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $400
+        Total Payment Lines     |     2
+        Payment 1               |   $400
+        """
+        self.setup_defaults()
+
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_confirm',
+        )
+
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # ===================================
+        # Cancel > Draft > Quote > Confirm
+        # ===================================
+        # This is not a standard feature, but some downstream modules do
+        # all kind of shit by allowing cancelling of orders. Deal with it
+        # too, because in the real world, people fucking cancel!
+        self.Sale.write([sale], {'state': 'draft'})
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # ===========================================
+        # Cancel > Draft (line x 2 )> Quote > Confirm
+        # ===========================================
+        self.Sale.cancel([sale])
+        self.Sale.draft([sale])
+        self.Sale.write([sale], {'state': 'draft'})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        self.SaleLine.write([sale.lines[0]], {'quantity': 2})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            with self.assertRaises(UserError):
+                # Complain, because there is not enough money!
+                self._confirm_sale_by_completing_payments([sale])
+
+    @with_transaction()
+    def test_0014_single_payment_CASE2C(self):
+        """
+        ===================================
+        Total Sale Amount       |   $200
+        Payment Authorize On:   | 'manual'
+        Payment Capture On:     | 'sale_confirm'
+        ===================================
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft (line x 2 )> Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $400
+        Total Payment Lines     |     2
+        Payment 1               |   $200
+        Payment 2               |   $200
+        """
+        self.setup_defaults()
+
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_confirm',
+        )
+
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # ===========================================
+        # Cancel > Draft (line x 2 )> Quote > Confirm
+        # ===========================================
+        self.Sale.cancel([sale])
+        self.Sale.draft([sale])
+        self.Sale.write([sale], {'state': 'draft'})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        self.SaleLine.write([sale.lines[0]], {'quantity': 2})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('400'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('400'))
+        self.assertEqual(sale.payment_captured, Decimal('400'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+    @with_transaction()
+    def test_0014_single_payment_CASE2D(self):
+        """
+        ===================================
+        Total Sale Amount       |   $200
+        Payment Authorize On:   | 'manual'
+        Payment Capture On:     | 'sale_confirm'
+        ===================================
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft (line x 2 )> Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $400
+        Total Payment Lines     |     1 (Expansion of lines)
+        Payment 1               |   $200
+        Payment 2               |   $200
+        """
+        self.setup_defaults()
+
+        sale = self._create_sale(
+            payment_authorize_on='manual',
+            payment_capture_on='sale_confirm',
+        )
+
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # ===========================================
+        # Cancel > Draft (line x 2 )> Quote > Confirm
+        # ===========================================
+        self.Sale.cancel([sale])
+        self.Sale.draft([sale])
+        self.Sale.write([sale], {'state': 'draft'})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        self.SaleLine.write([sale.lines[0]], {'quantity': 2})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('200'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Expand the payment
+        self.SalePayment.write([payment], {'amount': Decimal('400')})
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('400'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('400'))
+        self.assertEqual(sale.payment_captured, Decimal('400'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+    @with_transaction()
     def test_0015_single_payment_CASE3(self):
         """
         ===================================
@@ -524,10 +834,10 @@ class TestSale(BaseTestCase):
             self._process_sale_by_completing_payments([sale])
 
         self.assertEqual(sale.payment_total, Decimal('200'))
-        self.assertEqual(sale.payment_available, Decimal('0'))
         self.assertEqual(sale.payment_collected, Decimal('200'))
         self.assertEqual(sale.payment_captured, Decimal('200'))
         self.assertEqual(sale.payment_authorized, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
 
     @with_transaction()
     def test_0020_single_payment_CASE4(self):
@@ -588,6 +898,210 @@ class TestSale(BaseTestCase):
         self.assertEqual(sale.payment_collected, Decimal('200'))
         self.assertEqual(sale.payment_captured, Decimal('0'))
         self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+    @with_transaction()
+    def test_0022_single_payment_CASE4A(self):
+        """
+        ===================================
+        Total Sale Amount       |   $200
+        Payment Authorize On:   | 'sale_confirm'
+        Payment Capture On:     | 'manual'
+        ===================================
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft (line x 2 )> Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $400
+        Total Payment Lines     |     2
+        Payment 1               |   $200 (Problemo)
+        ===================================
+        """
+        self.setup_defaults()
+
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='manual',
+        )
+
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        # ===================================
+        # Cancel > Draft > Quote > Confirm
+        # ===================================
+        # This is not a standard feature, but some downstream modules do
+        # all kind of shit by allowing cancelling of orders. Deal with it
+        # too, because in the real world, people fucking cancel!
+        self.Sale.write([sale], {'state': 'draft'})
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        self.SaleLine.write([sale.lines[0]], {'quantity': 2})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            with self.assertRaises(UserError):
+                # Complain, because there is not enough money!
+                self._confirm_sale_by_completing_payments([sale])
+
+    @with_transaction()
+    def test_0022_single_payment_CASE4B(self):
+        """
+        ===================================
+        Total Sale Amount       |   $200
+        Payment Authorize On:   | 'sale_confirm'
+        Payment Capture On:     | 'manual'
+        ===================================
+        Total Payment Lines     |     1
+        Payment 1               |   $200
+        ===================================
+        Cancel > Draft (line x 2 )> Quote > Confirm
+        ===================================
+        Total Sale Amount       |   $400
+        Total Payment Lines     |     2
+        Payment 1               |   $400 (No problemo)
+        ===================================
+        """
+        self.setup_defaults()
+
+        sale = self._create_sale(
+            payment_authorize_on='sale_confirm',
+            payment_capture_on='manual',
+        )
+
+        self.assertEqual(sale.total_amount, Decimal('200'))
+        self.assertEqual(sale.payment_total, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('200'))
+        self.assertEqual(sale.payment_collected, Decimal('0'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('0'))
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        with Transaction().set_context(company=self.company.id):
+            self._process_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        # ===================================
+        # Cancel > Draft > Quote > Confirm
+        # ===================================
+        # This is not a standard feature, but some downstream modules do
+        # all kind of shit by allowing cancelling of orders. Deal with it
+        # too, because in the real world, people fucking cancel!
+        self.Sale.write([sale], {'state': 'draft'})
+        self.assertEqual(sale.state, 'draft')
+        # XXX: Clearing the cache because it does not seem to be doing it.
+        self.Sale.write([sale], {
+            'untaxed_amount_cache': None,
+            'tax_amount_cache': None,
+            'total_amount_cache': None,
+        })
+        self.SaleLine.write([sale.lines[0]], {'quantity': 2})
+        sale = self.Sale(sale.id)
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('200'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('200'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('200'))
+
+        # Create a payment
+        payment, = self.SalePayment.create([{
+            'sale': sale.id,
+            'amount': Decimal('200'),
+            'gateway': self.dummy_gateway,
+            'payment_profile': self.dummy_cc_payment_profile.id,
+            'credit_account': self.party.account_receivable.id,
+        }])
+
+        with Transaction().set_context(company=self.company.id):
+            self.Sale.quote([sale])
+            self._confirm_sale_by_completing_payments([sale])
+
+        self.assertEqual(sale.total_amount, Decimal('400'))
+        self.assertEqual(sale.payment_total, Decimal('400'))
+        self.assertEqual(sale.payment_available, Decimal('0'))
+        self.assertEqual(sale.payment_collected, Decimal('400'))
+        self.assertEqual(sale.payment_captured, Decimal('0'))
+        self.assertEqual(sale.payment_authorized, Decimal('400'))
 
     @with_transaction()
     def test_0025_single_payment_CASE5(self):

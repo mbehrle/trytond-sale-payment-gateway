@@ -186,8 +186,8 @@ class Payment(ModelSQL, ModelView):
             ])
             sum_transactions = lambda txns: sum((txn.amount for txn in txns))
             res["amount_consumed"][payment.id] = sum_transactions(filter(
-                    lambda t: t.state in ('authorized', 'completed', 'posted'),
-                    charge_transactions
+                lambda t: t.state in ('authorized', 'completed', 'posted'),
+                charge_transactions
             ))
             if "amount_authorized" in names:
                 res["amount_authorized"][payment.id] = sum_transactions(filter(
