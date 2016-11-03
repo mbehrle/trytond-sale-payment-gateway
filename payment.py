@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from decimal import Decimal
+from collections import defaultdict
 
 from trytond.model import ModelSQL, ModelView, fields
 from trytond.pool import PoolMeta, Pool
@@ -58,6 +59,12 @@ class Payment(ModelSQL, ModelView):
     amount_captured = fields.Function(
         fields.Numeric(
             'Amount Captured', digits=(16, Eval('currency_digits', 2)),
+            depends=['currency_digits'],
+        ), 'get_amount'
+    )
+    amount_refunded = fields.Function(
+        fields.Numeric(
+            'Amount Refunded', digits=(16, Eval('currency_digits', 2)),
             depends=['currency_digits'],
         ), 'get_amount'
     )
@@ -161,36 +168,48 @@ class Payment(ModelSQL, ModelView):
         """
         return [('sale.company', ) + tuple(clause[1:])]
 
-    def get_amount(self, name):
+    @classmethod
+    def get_amount(cls, records, names):
         """Getter method for fetching amounts.
         """
+        res = defaultdict(dict)
         PaymentTransaction = Pool().get('payment_gateway.transaction')
 
-        payment_transactions = PaymentTransaction.search([
-            ('sale_payment', '=', self.id)
-        ])
-        sum_transactions = lambda txns: sum((txn.amount for txn in txns))
-
-        if name == "amount_consumed":
-            return sum_transactions(filter(
+        for payment in records:
+            charge_transactions = PaymentTransaction.search([
+                ('sale_payment', '=', payment.id),
+                ('type', '=', 'charge'),
+            ])
+            refund_transactions = PaymentTransaction.search([
+                ('sale_payment', '=', payment.id),
+                ('type', '=', 'refund'),
+            ])
+            sum_transactions = lambda txns: sum((txn.amount for txn in txns))
+            res["amount_consumed"][payment.id] = sum_transactions(filter(
                 lambda t: t.state in ('authorized', 'completed', 'posted'),
-                payment_transactions
+                charge_transactions
             ))
-
-        elif name == "amount_authorized":
-            return sum_transactions(filter(
-                lambda t: t.state == 'authorized',
-                payment_transactions
-            ))
-
-        elif name == "amount_captured":
-            return sum_transactions(filter(
-                lambda t: t.state in ('completed', 'posted'),
-                payment_transactions
-            ))
-
-        elif name == "amount_available":
-            return max(self.amount - self.amount_consumed, Decimal('0'))
+            if "amount_authorized" in names:
+                res["amount_authorized"][payment.id] = sum_transactions(filter(
+                    lambda t: t.state == 'authorized',
+                    charge_transactions
+                ))
+            if "amount_captured" in names:
+                res["amount_captured"][payment.id] = sum_transactions(filter(
+                    lambda t: t.state in ('completed', 'posted'),
+                    charge_transactions
+                ))
+            if "amount_refunded" in names:
+                res["amount_refunded"][payment.id] = sum_transactions(filter(
+                    lambda t: t.state in ('completed', 'posted'),
+                    refund_transactions
+                ))
+            if "amount_available" in names:
+                res["amount_available"][payment.id] = max(
+                    payment.amount - res["amount_consumed"][payment.id],
+                    Decimal('0')
+                )
+        return dict(res)
 
     @staticmethod
     def default_sequence():
