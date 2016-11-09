@@ -100,6 +100,9 @@ class Sale:
             'add_payment': {
                 'invisible': Eval('state').in_(['cancel', 'draft']),
             },
+            'auth_capture': {
+                'invisible': Eval('state').in_(['cancel', 'draft', 'done']),
+            },
         })
         cls._error_messages.update({
             'insufficient_amount_to_authorize':
@@ -335,6 +338,18 @@ class Sale:
         self.save()
 
         return transactions
+
+    @classmethod
+    def auth_capture(cls, sales):
+        """
+        A button triggered version of authorizing or capturing payment directly
+        from an order.
+        """
+        for sale in sales:
+            if sale.state == 'confirmed':
+                sale.handle_payment_on_confirm()
+            elif sale.state == 'processing':
+                sale.handle_payment_on_process()
 
     def handle_payment_on_confirm(self):
         if self.payment_capture_on == 'sale_confirm':
