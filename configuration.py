@@ -10,10 +10,10 @@ class SaleConfiguration:
     __name__ = "sale.configuration"
 
     payment_authorize_on = fields.Selection(
-        "get_authorize_options", "Payment Authorize On", required=True,
+        "get_authorize_options", "Authorize payments", required=True,
     )
     payment_capture_on = fields.Selection(
-        "get_capture_options", "Payment Capture On", required=True,
+        "get_capture_options", "Capture payments", required=True,
     )
 
     @classmethod
@@ -48,15 +48,15 @@ class SaleConfiguration:
     @classmethod
     def get_authorize_options(cls):
         return [
-            ("manual", "Manual"),
-            ("sale_confirm", "Sale Confirm"),
-            ("sale_process", "Sale Process"),
+            ("manual", "manually"),
+            ("sale_confirm", "when order is confirmed."),
+            ("sale_process", "when order is processed."),
         ]
 
     @classmethod
     def get_capture_options(cls):
         return [
-            ("manual", "Manual"),
-            ("sale_confirm", "Sale Confirm"),
-            ("sale_process", "Sale Process"),
+            ("manual", "manually"),
+            ("sale_confirm", "when order is confirmed."),
+            ("sale_process", "when order is processed."),
         ]
