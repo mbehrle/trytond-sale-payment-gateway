@@ -35,11 +35,11 @@ class Sale:
     # Sale must be able to define when it should authorize and capture the
     # payments.
     payment_authorize_on = fields.Selection(
-        'get_authorize_options', 'Payment Authorize On', required=True,
+        'get_authorize_options', 'Authorize payments', required=True,
         states=READONLY_IF_PAYMENTS,
     )
     payment_capture_on = fields.Selection(
-        'get_capture_options', 'Payment Captured On', required=True,
+        'get_capture_options', 'Capture payments', required=True,
         states=READONLY_IF_PAYMENTS,
     )
 
