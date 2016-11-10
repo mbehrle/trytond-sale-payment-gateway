@@ -13,7 +13,7 @@ __all__ = ['Sale', 'PaymentTransaction', 'AddSalePaymentView', 'AddSalePayment']
 __metaclass__ = PoolMeta
 
 READONLY_STATES = {
-    'readonly': Eval('state').in_(('cancel', 'processing', 'done'))
+    'readonly': Eval('state').in_(['cancel', 'processing', 'done'])
 }
 DEPENDS = ['state']
 
