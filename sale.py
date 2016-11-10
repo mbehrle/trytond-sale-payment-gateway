@@ -350,6 +350,7 @@ class Sale:
                 sale.handle_payment_on_confirm()
             elif sale.state == 'processing':
                 sale.handle_payment_on_process()
+            sale.process_pending_payments()
 
     def handle_payment_on_confirm(self):
         if self.payment_capture_on == 'sale_confirm':
