@@ -12,9 +12,10 @@ from trytond.modules.payment_gateway.transaction import BaseCreditCardViewMixin
 __all__ = ['Sale', 'PaymentTransaction', 'AddSalePaymentView', 'AddSalePayment']
 __metaclass__ = PoolMeta
 
-READONLY_IF_PAYMENTS = {
-    'readonly': Not(Bool(Eval('payments')))
+READONLY_STATES = {
+    'readonly': Eval('state').in_(('cancel', 'processing', 'done'))
 }
+DEPENDS = ['state']
 
 
 class Sale:
@@ -36,11 +37,11 @@ class Sale:
     # payments.
     payment_authorize_on = fields.Selection(
         'get_authorize_options', 'Authorize payments', required=True,
-        states=READONLY_IF_PAYMENTS,
+        states=READONLY_STATES, depends=DEPENDS
     )
     payment_capture_on = fields.Selection(
         'get_capture_options', 'Capture payments', required=True,
-        states=READONLY_IF_PAYMENTS,
+        states=READONLY_STATES, depends=DEPENDS
     )
 
     gateway_transactions = fields.Function(
