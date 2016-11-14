@@ -747,10 +747,22 @@ class AddSalePayment(Wizard):
         profile_wizard.card_info.csc = self.payment_info.csc or ''
         profile_wizard.card_info.gateway = self.payment_info.gateway
         profile_wizard.card_info.provider = self.payment_info.gateway.provider
-        profile_wizard.card_info.address = Sale(
+        profile_wizard.card_info.party = self.payment_info.party
+
+        billing_address = Sale(
             Transaction().context.get('active_id')
         ).invoice_address
-        profile_wizard.card_info.party = self.payment_info.party
+        if not billing_address:
+            # If no billing address fallback to party's invoice address
+            try:
+                billing_address = self.payment_info.party.address_get(
+                    type='invoice'
+                )
+            except AttributeError:
+                # account_invoice module is not installed
+                pass
+
+        profile_wizard.card_info.address = billing_address
 
         with Transaction().set_context(return_profile=True):
             profile = profile_wizard.transition_add()
