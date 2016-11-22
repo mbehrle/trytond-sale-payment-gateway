@@ -518,6 +518,14 @@ class Sale:
     def process_all_pending_payments(cls):
         """Cron method authorizes waiting payments.
         """
+        User = Pool().get('res.user')
+
+        user = User(Transaction().user)
+        if not (Transaction().context.get('company') or user.company):
+            # Processing payments without user's company and company in
+            # context is not possible at all. Skip the execution.
+            return
+
         sales = cls.search([
             ('payment_processing_state', '!=', None)
         ])
