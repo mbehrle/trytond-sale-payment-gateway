@@ -87,10 +87,10 @@ tests_require = [
 ]
 
 MODULE = 'sale_payment_gateway'
-PREFIX = 'fio'
+PREFIX = 'm9s'
 MODULE2PREFIX = {
-    'payment_gateway': 'fio',
-    'invoice_payment_gateway': 'fio',
+    'payment_gateway': 'm9s',
+    'invoice_payment_gateway': 'm9s',
 }
 
 for dep in info.get('depends', []):
