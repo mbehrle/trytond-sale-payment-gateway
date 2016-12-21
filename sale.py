@@ -15,9 +15,10 @@ _ = make_lazy_gettext('sale_payment_gateway')
 __all__ = ['Sale', 'PaymentTransaction', 'AddSalePaymentView', 'AddSalePayment']
 __metaclass__ = PoolMeta
 
-READONLY_IF_PAYMENTS = {
-    'readonly': Not(Bool(Eval('payments')))
+READONLY_STATES = {
+    'readonly': Eval('state').in_(['cancel', 'processing', 'done'])
 }
+DEPENDS = ['state']
 
 
 class Sale:
@@ -38,12 +39,12 @@ class Sale:
     # Sale must be able to define when it should authorize and capture the
     # payments.
     payment_authorize_on = fields.Selection(
-        'get_authorize_options', 'Payment Authorize On', required=True,
-        states=READONLY_IF_PAYMENTS,
+        'get_authorize_options', 'Authorize payments', required=True,
+        states=READONLY_STATES, depends=DEPENDS
     )
     payment_capture_on = fields.Selection(
-        'get_capture_options', 'Payment Captured On', required=True,
-        states=READONLY_IF_PAYMENTS,
+        'get_capture_options', 'Capture payments', required=True,
+        states=READONLY_STATES, depends=DEPENDS
     )
 
     gateway_transactions = fields.Function(
@@ -102,6 +103,9 @@ class Sale:
         cls._buttons.update({
             'add_payment': {
                 'invisible': Eval('state').in_(['cancel', 'draft']),
+            },
+            'auth_capture': {
+                'invisible': Eval('state').in_(['cancel', 'draft', 'done']),
             },
         })
         cls._error_messages.update({
@@ -344,19 +348,40 @@ class Sale:
 
         return transactions
 
+    @classmethod
+    def auth_capture(cls, sales):
+        """
+        A button triggered version of authorizing or capturing payment directly
+        from an order.
+        """
+        for sale in sales:
+            if sale.state == 'confirmed':
+                sale.handle_payment_on_confirm()
+            elif sale.state == 'processing':
+                sale.handle_payment_on_process()
+            sale.process_pending_payments()
+
     def handle_payment_on_confirm(self):
         if self.payment_capture_on == 'sale_confirm':
-            self.capture_payments(self.total_amount)
+            self.capture_payments(
+                self.total_amount - self.payment_captured
+            )
 
         elif self.payment_authorize_on == 'sale_confirm':
-            self.authorize_payments(self.total_amount)
+            self.authorize_payments(
+                self.total_amount - self.payment_authorized
+            )
 
     def handle_payment_on_process(self):
         if self.payment_capture_on == 'sale_process':
-            self.capture_payments(self.total_amount)
+            self.capture_payments(
+                self.total_amount - self.payment_captured
+            )
 
         elif self.payment_authorize_on == 'sale_process':
-            self.authorize_payments(self.total_amount)
+            self.authorize_payments(
+                self.total_amount - self.payment_authorized
+            )
 
     def settle_manual_payments(self):
         """
@@ -385,13 +410,12 @@ class Sale:
             sale.handle_payment_on_confirm()
 
     @classmethod
-    @Workflow.transition('processing')
-    def proceed(cls, sales):
-        super(Sale, cls).proceed(sales)
-
-        for sale in [s for s in sales if s.invoice_state != 'paid']:
+    def process(cls, sales):
+        for sale in [s for s in sales if (s.state != 'confirmed' and
+                    s.invoice_state != 'paid')]:
             sale.settle_manual_payments()
             sale.handle_payment_on_process()
+        super(Sale, cls).process(sales)
 
     def _pay_using_credit_card(self, gateway, credit_card, amount):
         '''
@@ -502,6 +526,14 @@ class Sale:
     def process_all_pending_payments(cls):
         """Cron method authorizes waiting payments.
         """
+        User = Pool().get('res.user')
+
+        user = User(Transaction().user)
+        if not (Transaction().context.get('company') or user.company):
+            # Processing payments without user's company and company in
+            # context is not possible at all. Skip the execution.
+            return
+
         sales = cls.search([
             ('payment_processing_state', '!=', None)
         ])
@@ -738,10 +770,22 @@ class AddSalePayment(Wizard):
         profile_wizard.card_info.csc = self.payment_info.csc or ''
         profile_wizard.card_info.gateway = self.payment_info.gateway
         profile_wizard.card_info.provider = self.payment_info.gateway.provider
-        profile_wizard.card_info.address = Sale(
+        profile_wizard.card_info.party = self.payment_info.party
+
+        billing_address = Sale(
             Transaction().context.get('active_id')
         ).invoice_address
-        profile_wizard.card_info.party = self.payment_info.party
+        if not billing_address:
+            # If no billing address fallback to party's invoice address
+            try:
+                billing_address = self.payment_info.party.address_get(
+                    type='invoice'
+                )
+            except AttributeError:
+                # account_invoice module is not installed
+                pass
+
+        profile_wizard.card_info.address = billing_address
 
         with Transaction().set_context(return_profile=True):
             profile = profile_wizard.transition_add()
