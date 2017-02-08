@@ -48,10 +48,6 @@ msgstr ""
 "Eigentümer des Zahlungsprofils ist %s, aber der gegenwärtige Kunde ist %s."
 
 msgctxt "error:sale.sale:"
-msgid "Sale Payments are %s"
-msgstr "Zahlungen sind %s"
-
-msgctxt "error:sale.sale:"
 msgid "Sale Payments are waiting for authorization"
 msgstr "Zahlungen warten noch auf automatische Autorisierung."
 
@@ -90,6 +86,10 @@ msgstr "Eingenommener Betrag"
 msgctxt "field:sale.payment,amount_consumed:"
 msgid "Amount Consumed"
 msgstr "Ausgeschöpfter Betrag"
+
+msgctxt "field:sale.payment,amount_refunded:"
+msgid "Amount Refunded"
+msgstr "Erstatteter Betrag"
 
 msgctxt "field:sale.payment,company:"
 msgid "Company"
@@ -252,7 +252,7 @@ msgid "Gateway Transactions"
 msgstr "Gatewaytransaktionen"
 
 msgctxt "field:sale.sale,payment_authorize_on:"
-msgid "Payment Authorize On"
+msgid "Authorize payments"
 msgstr "Zahlungsautorisierung"
 
 msgctxt "field:sale.sale,payment_authorized:"
@@ -264,7 +264,7 @@ msgid "Payment Remaining"
 msgstr "Zahlung verbleibend"
 
 msgctxt "field:sale.sale,payment_capture_on:"
-msgid "Payment Captured On"
+msgid "Capture payments"
 msgstr "Zahlungseinzug"
 
 msgctxt "field:sale.sale,payment_captured:"
@@ -348,23 +348,23 @@ msgctxt "model:sale.payment.add_view,name:"
 msgid "View for adding Sale Payments"
 msgstr "Zahlung eingeben"
 
-msgctxt "nereid:payment.py:344"
+msgctxt "nereid:payment.py:302"
 msgid "Paid by Cash"
 msgstr "Barzahlung/Überweisung"
 
-msgctxt "nereid:payment.py:347"
+msgctxt "nereid:payment.py:305"
 msgid "Paid by Card"
-msgstr "Kartenzahlung"
+msgstr "Bezahlt mit Karte"
 
-msgctxt "nereid:sale.py:240"
+msgctxt "nereid:sale.py:244"
 msgid "Payment from sale"
 msgstr "Zahlung aus Verkauf"
 
-msgctxt "nereid:sale.py:288"
+msgctxt "nereid:sale.py:292"
 msgid "Payment from sale"
 msgstr "Zahlung aus Verkauf"
 
-msgctxt "nereid:sale.py:371"
+msgctxt "nereid:sale.py:397"
 msgid "Post manual payments on Processing Order"
 msgstr "Zahlung für Gateway Bar/Überweisung bei Auftragsdurchführung"
 
@@ -471,10 +471,6 @@ msgstr "Karteninformation"
 msgctxt "view:sale.payment:"
 msgid "Payments"
 msgstr "Gateway-Zahlungen"
-
-msgctxt "view:sale.sale:"
-msgid "Add Payment"
-msgstr "Gateway-Zahlung hinzufügen"
 
 msgctxt "view:sale.sale:"
 msgid "Payments"
