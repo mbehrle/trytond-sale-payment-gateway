@@ -411,7 +411,7 @@ class Sale:
 
     @classmethod
     def process(cls, sales):
-        for sale in [s for s in sales if (s.state != 'confirmed' and
+        for sale in [s for s in sales if (s.state == 'confirmed' and
                     s.invoice_state != 'paid')]:
             sale.settle_manual_payments()
             sale.handle_payment_on_process()
