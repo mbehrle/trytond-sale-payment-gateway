@@ -146,16 +146,20 @@ class Sale:
         """Return all the options from sale configuration.
         """
         SaleConfiguration = Pool().get('sale.configuration')
-
-        return SaleConfiguration.payment_authorize_on.selection
+        field_name = 'payment_authorize_on'
+        selection = SaleConfiguration.fields_get(
+            [field_name])[field_name]['selection']
+        return selection
 
     @classmethod
     def get_capture_options(cls):
         """Return all the options from sale configuration.
         """
         SaleConfiguration = Pool().get('sale.configuration')
-
-        return SaleConfiguration.payment_capture_on.selection
+        field_name = 'payment_capture_on'
+        selection = SaleConfiguration.fields_get(
+            [field_name])[field_name]['selection']
+        return selection
 
     @staticmethod
     def default_payment_authorize_on():
