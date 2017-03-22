@@ -112,8 +112,8 @@ class Payment(ModelSQL, ModelView):
 
     def get_rec_name(self, name):
         if self.payment_profile:
-            return "%s - %s - %s" % (
-                self.gateway.rec_name, self.payment_profile, self.amount
+            return "%s - %s" % (
+                self.payment_profile.rec_name, self.amount
             )
         return "%s - %s" % (self.gateway.rec_name, self.amount)
 
