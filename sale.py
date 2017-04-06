@@ -249,6 +249,10 @@ class Sale:
         if self.payment_processing_state:
             self._raise_sale_payments_waiting()
 
+        # Skip authorize when there are already sufficient payments
+        if amount <= self.payment_collected:
+            return []
+
         if amount > self.payment_available:
             self.raise_user_error(
                 "insufficient_amount_to_authorize", error_args=(
