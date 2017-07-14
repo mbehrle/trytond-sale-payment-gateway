@@ -26,7 +26,9 @@ class Sale:
     # it provides a more cusomizable UX than directly adding a record.
     # For example, taking CC numbers.
     payments = fields.One2Many(
-        'sale.payment', 'sale', 'Payments',
+        'sale.payment', 'sale', 'Payments', states={
+            'readonly': Eval('state').in_(['done', 'cancel'])
+        },
     )
     sorted_payments = fields.Function(
         fields.One2Many('sale.payment', None, 'Payments'),
