@@ -729,12 +729,16 @@ class AddSalePayment(Wizard):
         """
         SalePayment = Pool().get('sale.payment')
 
+        payment_profile = profile
+        if self.payment_info.method != 'credit_card':
+            payment_profile = None
+
         return SalePayment(
             sale=Transaction().context.get('active_id'),
             credit_account=self.payment_info.credit_account,
             party=self.payment_info.party,
             gateway=self.payment_info.gateway,
-            payment_profile=profile,
+            payment_profile=payment_profile,
             amount=self.payment_info.amount,
             reference=self.payment_info.reference or None,
         )
