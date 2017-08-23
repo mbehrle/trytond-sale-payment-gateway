@@ -354,7 +354,7 @@ msgstr "Barzahlung/Überweisung"
 
 msgctxt "nereid:payment.py:305"
 msgid "Paid by Card"
-msgstr "Bezahlt mit Karte"
+msgstr "Zahlung mit Karte"
 
 msgctxt "nereid:sale.py:244"
 msgid "Payment from sale"
