@@ -281,7 +281,7 @@ msgstr "Anstehende Zahlungsaktion"
 
 msgctxt "field:sale.sale,payment_total:"
 msgid "Total Payment"
-msgstr "Fälliger Gesamtbetrag"
+msgstr "Gesamtbetrag aller Gateway-Zahlungen"
 
 msgctxt "field:sale.sale,payments:"
 msgid "Payments"
