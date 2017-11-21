@@ -571,7 +571,9 @@ class PaymentTransaction:
 
     sale_payment = fields.Many2One(
         'sale.payment', 'Sale Payment', ondelete='RESTRICT', select=True,
-    )
+        states={
+            'readonly': Eval('state') != 'draft'
+            }, depends=['state'])
 
     def get_shipping_address(self, name):
         return self.sale_payment and self.sale_payment.sale and \
