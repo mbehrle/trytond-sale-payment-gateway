@@ -210,10 +210,8 @@ class Payment(ModelSQL, ModelView):
                     refund_transactions
                 ))
             if "amount_available" in names:
-                res["amount_available"][payment.id] = max(
-                    payment.amount - res["amount_consumed"][payment.id],
-                    Decimal('0')
-                )
+                res["amount_available"][payment.id] = (
+                    payment.amount - res["amount_consumed"][payment.id])
         return dict(res)
 
     @staticmethod
@@ -249,12 +247,13 @@ class Payment(ModelSQL, ModelView):
                 self.payment_profile and
                 self.payment_profile.address or self.sale.invoice_address
             ),
-            amount=self.sale.currency.round(amount),
+            amount=abs(self.sale.currency.round(amount)),
             currency=self.sale.currency,
             gateway=self.gateway,
             sale_payment=self.id,
             provider_reference=self.reference,
             origin='%s,%d' % (self.sale.__name__, self.sale.id),
+            type = 'charge' if amount >= 0 else 'refund',
         )
 
     def authorize(self):
