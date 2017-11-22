@@ -275,6 +275,10 @@ msgctxt "field:sale.sale,payment_collected:"
 msgid "Payment Collected"
 msgstr "Eingenommener Zahlungsbetrag"
 
+msgctxt "field:sale.sale,payment_refunded:"
+msgid "Payment Refunded"
+msgstr "Erstatteter Zahlungsbetrag"
+
 msgctxt "field:sale.sale,payment_processing_state:"
 msgid "Payment Processing State"
 msgstr "Anstehende Zahlungsaktion"

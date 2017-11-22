@@ -10,6 +10,8 @@
             <field name="payment_total"/>
             <label name="payment_collected"/>
             <field name="payment_collected"/>
+            <label name="payment_refunded"/>
+            <field name="payment_refunded"/>
             <field name="sorted_payments" colspan="4"/>
             <group id="payment_state_and_amount" col="6" colspan="4">
                 <label name="payment_authorized"/>

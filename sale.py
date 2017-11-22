@@ -68,6 +68,13 @@ class Sale:
             help="Total value of payments collected"
         ), 'get_payment',
     )
+    payment_refunded = fields.Function(
+        fields.Numeric(
+            'Payment Refunded', digits=(16, Eval('currency_digits', 2)),
+            depends=['currency_digits'],
+            help="Total value of payments refunded"
+        ), 'get_payment',
+    )
     payment_available = fields.Function(
         fields.Numeric(
             'Payment Remaining', digits=(16, Eval('currency_digits', 2)),
@@ -214,6 +221,11 @@ class Sale:
         elif name == 'payment_authorized':
             return Decimal(sum(
                 [payment.amount_authorized for payment in payments]
+            ))
+
+        elif name == 'payment_refunded':
+            return Decimal(sum(
+                [payment.amount_refunded for payment in payments]
             ))
 
         elif name == 'payment_collected':
