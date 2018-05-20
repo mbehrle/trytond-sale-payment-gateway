@@ -320,6 +320,10 @@ msgctxt "help:sale.sale,payment_collected:"
 msgid "Total value of payments collected"
 msgstr "Gesamtwert aller eingenommener Zahlungen"
 
+msgctxt "help:sale.sale,payment_refunded:"
+msgid "Total value of payments refunded"
+msgstr "Gesamtbetrag der erstatteten Zahlungen"
+
 msgctxt "help:sale.sale,payment_total:"
 msgid "Total value of payments"
 msgstr "Gesamter Wert der Zahlungen"
@@ -352,9 +356,17 @@ msgctxt "model:sale.payment.add_view,name:"
 msgid "View for adding Sale Payments"
 msgstr "Zahlung eingeben"
 
+msgctxt "nereid:payment.py:301"
+msgid "Paid by Cash"
+msgstr "Barzahlung/Überweisung"
+
 msgctxt "nereid:payment.py:302"
 msgid "Paid by Cash"
 msgstr "Barzahlung/Überweisung"
+
+msgctxt "nereid:payment.py:304"
+msgid "Paid by Card"
+msgstr "Zahlung mit Karte"
 
 msgctxt "nereid:payment.py:305"
 msgid "Paid by Card"
@@ -364,11 +376,23 @@ msgctxt "nereid:sale.py:244"
 msgid "Payment from sale"
 msgstr "Zahlung aus Verkauf"
 
+msgctxt "nereid:sale.py:262"
+msgid "Payment from sale"
+msgstr "Zahlung aus Verkauf"
+
 msgctxt "nereid:sale.py:292"
 msgid "Payment from sale"
 msgstr "Zahlung aus Verkauf"
 
+msgctxt "nereid:sale.py:314"
+msgid "Payment from sale"
+msgstr "Zahlung aus Verkauf"
+
 msgctxt "nereid:sale.py:397"
+msgid "Post manual payments on Processing Order"
+msgstr "Zahlung für Gateway Bar/Überweisung bei Auftragsdurchführung"
+
+msgctxt "nereid:sale.py:419"
 msgid "Post manual payments on Processing Order"
 msgstr "Zahlung für Gateway Bar/Überweisung bei Auftragsdurchführung"
 
