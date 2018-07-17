@@ -315,10 +315,14 @@ class Sale:
         if self.payment_processing_state:
             self._raise_sale_payments_waiting()
 
-        if ((amount - self.payment_available + self.payment_authorized)
+        # Raise a user error if
+        # - the amount is greater than the completed + posted payments (without
+        #   authorized)
+        #   (payment_available is the difference between amounts of the
+        #   payments and authorized + completed + posted transactions)
+        # - m9s: the amount is less or equal the collected payments
+        if ((amount - self.payment_available - self.payment_authorized)
                 > threshold and not (amount <= self.payment_collected)):
-        # if (amount - self.payment_available - self.payment_authorized) > \
-        #       threshold:
             self.raise_user_error(
                 "insufficient_amount_to_capture", error_args=(
                     amount,
