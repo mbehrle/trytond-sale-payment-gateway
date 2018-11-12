@@ -140,6 +140,7 @@ class Payment(ModelSQL, ModelView):
             ('kind', 'in', cls._credit_account_domain())
         ]
         cls.credit_account.depends = ['company']
+        cls._order.insert(0, ('sequence', 'ASC'))
 
     @fields.depends('sale')
     def on_change_with_credit_account(self, name=None):
