@@ -730,6 +730,13 @@ class AddSalePaymentView(BaseCreditCardViewMixin, ModelView):
         """
         return self.gateway.method
 
+    @fields.depends('party')
+    def on_change_party(self):
+        if self.party and len(self.party.payment_profiles) == 1:
+            self.payment_profile = self.party.payment_profiles[0]
+        else:
+            self.payment_profile = None
+
     @fields.depends('gateway')
     def on_change_gateway(self):
         if self.gateway:
