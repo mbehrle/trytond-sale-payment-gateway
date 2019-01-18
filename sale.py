@@ -647,9 +647,14 @@ class AddSalePaymentView(BaseCreditCardViewMixin, ModelView):
         ],
         states={
             'required': And(
-                Eval('method') == 'credit_card', Bool(Eval('use_existing_card'))
-            ),
-            'invisible': ~Bool(Eval('use_existing_card'))
+                Eval('method') == 'credit_card',
+                Bool(Eval('use_existing_card'))
+                ),
+            'invisible': Or(
+                ~Eval('use_existing_card'),
+                ~Eval('gateway'),
+                Eval('method') == 'manual',
+                ),
         }, depends=['method', 'use_existing_card', 'party', 'gateway']
     )
     amount = fields.Numeric(
@@ -682,6 +687,7 @@ class AddSalePaymentView(BaseCreditCardViewMixin, ModelView):
 
         INV = Or(
             Eval('method') == 'manual',
+            ~Bool(Eval('gateway')),
             And(
                 Eval('method') == 'credit_card',
                 Bool(Eval('use_existing_card'))

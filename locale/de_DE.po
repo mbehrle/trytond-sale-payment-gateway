@@ -489,8 +489,8 @@ msgid "Add Payment"
 msgstr "Zahlung hinzufügen"
 
 msgctxt "view:sale.payment.add_view:"
-msgid "Add Payment Profile"
-msgstr "Zahlungsprofil hinzufügen"
+msgid "Card Payment"
+msgstr "Kartenzahlung"
 
 msgctxt "view:sale.payment.add_view:"
 msgid "Card Information"
