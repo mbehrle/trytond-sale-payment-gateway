@@ -783,7 +783,7 @@ class AddSalePayment(Wizard):
             'credit_account': sale.party.account_receivable.id,
             'owner': sale.party.name,
             'currency_digits': sale.currency_digits,
-            'amount': sale.total_amount - sale.payment_total,
+            'amount': sale._get_amount_to_checkout(),
             'user': Transaction().user,
         }
         return res
