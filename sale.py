@@ -852,11 +852,6 @@ class AddSalePayment(Wizard):
         Creates a new payment and ends the wizard
         """
         profile = self.payment_info.payment_profile
-        if self.payment_info.method == 'credit_card' and (
-            not self.payment_info.use_existing_card
-        ):
-            profile = self.create_payment_profile()
-
         payment = self.create_sale_payment(profile=profile)
         payment.save()
         return 'end'

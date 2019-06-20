@@ -79,7 +79,6 @@ class Payment(ModelSQL, ModelView):
             ('gateway', '=', Eval('gateway')),
         ],
         states={
-            'required': Eval('method') == 'credit_card',
             'invisible': Eval('method') != 'credit_card',
         },
         ondelete='RESTRICT', depends=['party', 'gateway', 'method'],
@@ -301,10 +300,7 @@ class Payment(ModelSQL, ModelView):
         if self.method == 'manual':
             return unicode(_('Paid by Cash'))
         elif self.method == 'credit_card':
-            return (
-                unicode(_('Paid by Card')) + ' (' + ('xxxx ' * 3) +
-                self.payment_profile.last_4_digits + ')'
-            )
+            return unicode(_('Paid by Card'))
 
     @classmethod
     def _credit_account_domain(cls):
