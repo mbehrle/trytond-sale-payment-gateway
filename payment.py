@@ -234,8 +234,9 @@ class Payment(ModelSQL, ModelView):
     def _create_payment_transaction(self, amount, description):
         """Creates an active record for gateway transaction.
         """
-        PaymentTransaction = Pool().get('payment_gateway.transaction')
-        Date = Pool().get('ir.date')
+        pool = Pool()
+        PaymentTransaction = pool.get('payment_gateway.transaction')
+        Date = pool.get('ir.date')
 
         return PaymentTransaction(
             description=description or 'Auto charge from sale',
